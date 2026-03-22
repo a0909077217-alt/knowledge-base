@@ -88,7 +88,7 @@ function getWeekKey(ts) {
 }
 
 // ── AI Analysis ───────────────────────────────────────────────
-async function runAIAnalysis(apiKey, { url, platform, rawText, title }) {
+async function runAIAnalysis({ url, platform, rawText, title }) {
   const context = [
     url ? `來源網址：${url}` : "",
     platform ? `平台：${PLATFORM_META[platform]?.label || platform}` : "",
@@ -106,13 +106,9 @@ ${context}
   "notes": "（筆記欄）整理這份內容的主要論點、核心架構、重要數據或引用，用條列式，每點簡潔扼要"
 }`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("/.netlify/functions/claude", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1000,
@@ -217,8 +213,6 @@ function LoginScreen() {
 // ── Main App ──────────────────────────────────────────────────
 function App() {
   const [user, setUser] = useState(undefined);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("kb_anthropic_key") || "");
-  const [showApiSetup, setShowApiSetup] = useState(false);
   const [notes, setNotes] = useState([]);
   const [view, setView] = useState("dashboard");
   const [editingNote, setEditingNote] = useState(null);
@@ -269,10 +263,9 @@ function App() {
   });
 
   async function handleAIAnalysis() {
-    if (!apiKey) { setShowApiSetup(true); return; }
     setAiLoading(true); setAiError("");
     try {
-      const result = await runAIAnalysis(apiKey, {
+      const result = await runAIAnalysis({
         url: editingNote.resourceUrl,
         platform: editingNote.platform || detectPlatform(editingNote.resourceUrl),
         rawText,
@@ -335,7 +328,6 @@ function App() {
 
   if (user === undefined) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh"}}><div className="spinner" style={{width:32,height:32}} /></div>;
   if (!user) return <LoginScreen />;
-  if (showApiSetup) return <ApiKeySetup onSave={k=>{if(k){setApiKey(k);}setShowApiSetup(false);}} />;
 
   return (
     <div style={{fontFamily:"inherit",minHeight:"100vh",background:"#fafafa",color:"#1a1a1a"}}>
@@ -352,7 +344,7 @@ function App() {
             <img src={user.photoURL} alt="" style={{width:28,height:28,borderRadius:"50%",border:"1px solid #e0e0e0"}} />
             <button onClick={()=>{setEditingNote(blankNote(""));setRawText("");setShowRawText(false);setAiError("");setView("editor");}} style={{padding:"6px 10px",borderRadius:7,border:"1px solid #e0e0e0",background:"#fff",color:"#333",fontSize:12,fontWeight:500,cursor:"pointer"}}>+ 筆記</button>
             <button onClick={()=>{setEditingNote(blankNote("https://"));setRawText("");setShowRawText(false);setAiError("");setView("editor");}} style={{padding:"6px 10px",borderRadius:7,border:"none",background:"#111",color:"#fff",fontSize:12,fontWeight:500,cursor:"pointer"}}>+ 資源</button>
-            <button onClick={()=>setShowApiSetup(true)} title="AI 設定" style={{padding:"5px 8px",borderRadius:7,border:"1px solid #e0e0e0",background:"#fff",fontSize:14,cursor:"pointer"}}>🤖</button>
+            <button onClick={()=>setShowApiSetup(true)} title="AI 設定" style={{display:"none"}}></button>
             <button onClick={handleSignOut} style={{padding:"5px 10px",borderRadius:7,border:"1px solid #e0e0e0",background:"#fff",color:"#888",fontSize:12,cursor:"pointer"}}>登出</button>
           </div>
         </div>
@@ -519,13 +511,12 @@ function App() {
                     <div style={{fontSize:11,color:"#999",marginTop:4,textAlign:"right"}}>{rawText.length}/6000 字</div>
                   </div>
                 )}
-                {aiError&&<div style={{fontSize:12,color:"#d00",marginBottom:8,padding:"6px 10px",background:"#fff5f5",borderRadius:6}}>{aiError}</div>}
+                  {aiError&&<div style={{fontSize:12,color:"#d00",marginBottom:8,padding:"6px 10px",background:"#fff5f5",borderRadius:6}}>{aiError}</div>}
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   <button className="ai-btn" onClick={handleAIAnalysis} disabled={aiLoading||(!editingNote.resourceUrl&&!rawText&&!editingNote.title)}>
                     {aiLoading?<><div className="btn-spinner"/><span>分析中…</span></>:<><span>🤖</span><span>AI 分析並填入</span></>}
                   </button>
-                  {!apiKey&&<span style={{fontSize:11,color:"#7c3aed"}}>需先設定 API Key（點右上角 🤖）</span>}
-                  {apiKey&&!aiLoading&&<span style={{fontSize:11,color:"#888"}}>需提供連結、標題或文字內容其中一項</span>}
+                  <span style={{fontSize:11,color:"#888"}}>需提供連結、標題或文字內容其中一項</span>
                 </div>
               </div>
 
